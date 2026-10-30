@@ -3,10 +3,12 @@ import { supabase } from './supabase.js';
 import Conectar from './Conectar.jsx';
 import Conocimiento from './Conocimiento.jsx';
 import Flujos from './Flujos.jsx';
+import Pipeline from './Pipeline.jsx';
 import './panel.css';
 
 const PESTANAS = [
   ['conversaciones', 'Conversaciones'],
+  ['pipeline', 'Pipeline'],
   ['flujos', 'Flujos'],
   ['conocimiento', 'Conocimiento'],
   ['whatsapp', 'WhatsApp'],
@@ -31,6 +33,7 @@ export default function Panel({ session, org, orgs, onCambiarOrg }) {
         <button className="enlace" onClick={() => supabase.auth.signOut()}>Salir</button>
       </header>
       {tab === 'conversaciones' && <Conversaciones org={org} />}
+      {tab === 'pipeline' && <Pipeline org={org} supabase={supabase} />}
       {tab === 'flujos' && <Flujos org={org} supabase={supabase} />}
       {tab === 'conocimiento' && <Conocimiento org={org} />}
       {tab === 'whatsapp' && <Conexiones org={org} session={session} />}

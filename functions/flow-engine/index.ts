@@ -76,9 +76,16 @@ async function aplicar(admin: any, conv: any, contactId: string | null, acciones
       } else if (a.tipo === 'etiquetar' && contactId) {
         await admin.rpc('contacto_agregar_etiqueta', { p_contact: contactId, p_etiqueta: a.etiqueta });
       } else if (a.tipo === 'etapa' && contactId) {
-        // Solo etapas que existen en el pipeline de este negocio
-        const { data: et } = await admin.from('pipeline_etapas').select('id').eq('organization_id', conv.organization_id).eq('clave', a.etapa).maybeSingle();
-        if (et) await admin.from('contacts').update({ etapa: a.etapa }).eq('id', contactId);
+        // La etapa puede ser el id de una etapa del pipeline (nuevo) o la clave antigua (nuevo, interesado…) dentro del pipeline del contacto
+        const esId = /^[0-9a-f-]{36}$/i.test(a.etapa);
+        let q = admin.from('pipeline_etapas').select('clave, pipeline_id').eq('organization_id', conv.organization_id);
+        if (esId) q = q.eq('id', a.etapa);
+        else {
+          const { data: c } = await admin.from('contacts').select('pipeline_id').eq('id', contactId).maybeSingle();
+          q = q.eq('clave', a.etapa).eq('pipeline_id', c?.pipeline_id ?? '00000000-0000-0000-0000-000000000000');
+        }
+        const { data: et } = await q.maybeSingle();
+        if (et) await admin.from('contacts').update({ etapa: et.clave, pipeline_id: et.pipeline_id }).eq('id', contactId);
       } else if (a.tipo === 'humano') {
         await admin.from('conversations').update({ atiende: 'humano', handoff_reason: a.motivo }).eq('id', conv.id);
       }

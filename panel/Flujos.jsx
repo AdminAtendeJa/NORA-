@@ -19,7 +19,6 @@ const TIPOS = {
   nora: { nombre: 'Nora responde', icono: '🤖', ayuda: 'Detiene el bot; sigue la IA' },
   fin: { nombre: 'Detener bot', icono: '⛔', ayuda: 'Termina el flujo' },
 };
-const ETAPAS = [['nuevo', 'Nuevo'], ['interesado', 'Interesado'], ['cliente', 'Cliente'], ['perdido', 'Perdido']];
 const VALIDACIONES = [['texto', 'Texto libre'], ['numero', 'Número'], ['si_no', 'Sí / No'], ['opciones', 'Opciones']];
 const OPERADORES = [['igual', 'es igual a'], ['distinto', 'es distinto de'], ['contiene', 'contiene'], ['mayor', 'es mayor que'], ['menor', 'es menor que'], ['existe', 'tiene respuesta']];
 
@@ -30,7 +29,7 @@ const datosNuevos = (tipo) => ({
   mensaje: { texto: '', botones: [], espera: false, timeoutMin: 60 },
   pregunta: { texto: '', campo: '', validacion: 'texto', opciones: [], timeoutMin: 60 },
   condicion: { campo: '', op: 'igual', valor: '' },
-  esperar: { minutos: 5 }, etiquetar: { etiqueta: '' }, etapa: { etapa: 'interesado' }, humano: { motivo: '' }, nora: {}, fin: {},
+  esperar: { minutos: 5 }, etiquetar: { etiqueta: '' }, etapa: { etapa: '' }, humano: { motivo: '' }, nora: {}, fin: {},
 }[tipo]);
 
 // Salidas válidas de un paso según su configuración: sirve para soltar las conexiones que dejan de existir.
@@ -220,7 +219,7 @@ function NodoCondicion({ id, data, selected }) {
 }
 
 function NodoSimple({ id, data, selected, tipo }) {
-  const { actualizar, soloLectura } = useContext(Ctx);
+  const { actualizar, soloLectura, etapasOrg } = useContext(Ctx);
   return (
     <Caja id={id} tipo={tipo} selected={selected}>
       {tipo === 'esperar' && (
@@ -230,9 +229,15 @@ function NodoSimple({ id, data, selected, tipo }) {
       )}
       {tipo === 'etiquetar' && <input className="nodrag" disabled={soloLectura} placeholder="Etiqueta (ej. lead caliente)" value={data.etiqueta} onChange={(e) => actualizar(id, { etiqueta: e.target.value })} aria-label="Etiqueta" />}
       {tipo === 'etapa' && (
-        <select className="nodrag" disabled={soloLectura} value={data.etapa} onChange={(e) => actualizar(id, { etapa: e.target.value })} aria-label="Etapa">
-          {ETAPAS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
-        </select>
+        etapasOrg.length === 0
+          ? <p className="fl-nota">Primero crea un pipeline con etapas en la pestaña Pipeline.</p>
+          : (
+            <select className="nodrag" disabled={soloLectura} value={data.etapa || ''} onChange={(e) => actualizar(id, { etapa: e.target.value })} aria-label="Etapa">
+              <option value="" disabled>Elige una etapa…</option>
+              {data.etapa && !etapasOrg.some((x) => x.id === data.etapa) && <option value={data.etapa}>{data.etapa} (antigua)</option>}
+              {etapasOrg.map((x) => <option key={x.id} value={x.id}>{x.pipeline} · {x.nombre}</option>)}
+            </select>
+          )
       )}
       {tipo === 'humano' && <input className="nodrag" disabled={soloLectura} placeholder="Motivo para el equipo (opcional)" value={data.motivo ?? ''} onChange={(e) => actualizar(id, { motivo: e.target.value })} aria-label="Motivo" />}
       {tipo === 'nora' && <p className="fl-nota">Desde aquí responde Nora con el conocimiento del negocio.</p>}
@@ -249,7 +254,7 @@ const nodeTypes = {
 };
 
 // ---- Previsualizar bot: ejecuta el mismo motor que el servidor, con botones pulsables y reloj simulado ----
-function Previsualizar({ def, onCerrar }) {
+function Previsualizar({ def, etapasOrg, onCerrar }) {
   const [chat, setChat] = useState([]);
   const [estado, setEstado] = useState(null);
   const [texto, setTexto] = useState('');
@@ -260,7 +265,7 @@ function Previsualizar({ def, onCerrar }) {
   const aChat = (acciones) => acciones.map((a) => {
     if (a.tipo === 'enviar') return { de: 'nora', texto: a.texto, botones: a.botones };
     if (a.tipo === 'etiquetar') return { de: 'sis', texto: `🏷️ Etiqueta: ${a.etiqueta}` };
-    if (a.tipo === 'etapa') return { de: 'sis', texto: `📍 Etapa: ${a.etapa}` };
+    if (a.tipo === 'etapa') return { de: 'sis', texto: `📍 Etapa: ${etapasOrg.find((x) => x.id === a.etapa)?.nombre || a.etapa}` };
     if (a.tipo === 'humano') return { de: 'sis', texto: `🙋 Pasa a una persona (${a.motivo})` };
     return null;
   }).filter(Boolean);
@@ -335,6 +340,12 @@ function Editor({ flujo, org, supabase, puedeEditar, onCerrar }) {
   const [guardando, setGuardando] = useState(false);
   const [vistaPrevia, setVistaPrevia] = useState(false);
   const [verPendientes, setVerPendientes] = useState(false);
+  const [etapasOrg, setEtapasOrg] = useState([]);
+  useEffect(() => {
+    supabase.from('pipeline_etapas').select('id, nombre, orden, pipelines(nombre, orden)').eq('organization_id', org.id)
+      .then(({ data }) => setEtapasOrg((data || []).map((e) => ({ id: e.id, nombre: e.nombre, pipeline: e.pipelines?.nombre || '', o: [e.pipelines?.orden ?? 0, e.orden] }))
+        .sort((a, b) => a.o[0] - b.o[0] || a.o[1] - b.o[1])));
+  }, [org.id, supabase]);
   const { screenToFlowPosition } = useReactFlow();
   const nodesRef = useRef(nodes); nodesRef.current = nodes;
 
@@ -419,7 +430,7 @@ function Editor({ flujo, org, supabase, puedeEditar, onCerrar }) {
   }
 
   const cerrar = () => { if (!sucio || window.confirm('Tienes cambios sin guardar. ¿Salir sin guardar?')) onCerrar(!!id); };
-  const ctx = useMemo(() => ({ actualizar, quitarBoton, eliminar, campos, numero, soloLectura: !puedeEditar }), [actualizar, quitarBoton, eliminar, campos, numero, puedeEditar]);
+  const ctx = useMemo(() => ({ actualizar, quitarBoton, eliminar, campos, numero, etapasOrg, soloLectura: !puedeEditar }), [actualizar, quitarBoton, eliminar, campos, numero, etapasOrg, puedeEditar]);
 
   return (
     <Ctx.Provider value={ctx}>
@@ -463,7 +474,7 @@ function Editor({ flujo, org, supabase, puedeEditar, onCerrar }) {
             <Controls showInteractive={false} />
             <MiniMap pannable zoomable className="fl-minimapa" style={{ width: 150, height: 96 }} />
           </ReactFlow>
-          {vistaPrevia && <Previsualizar def={def} onCerrar={() => setVistaPrevia(false)} />}
+          {vistaPrevia && <Previsualizar def={def} etapasOrg={etapasOrg} onCerrar={() => setVistaPrevia(false)} />}
           </div>
         </div>
       </div>

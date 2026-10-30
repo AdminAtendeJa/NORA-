@@ -265,6 +265,7 @@ export function revisar(def: Definicion): { errores: string[]; avisos: string[] 
     }
     if (n.tipo === 'esperar' && !(n.minutos > 0)) errores.push(`${nombre(n)}: la espera debe ser mayor que 0 minutos`);
     if (n.tipo === 'etiquetar' && !n.etiqueta?.trim()) errores.push(`${nombre(n)}: falta la etiqueta`);
+    if (n.tipo === 'etapa' && !n.etapa?.trim()) errores.push(`${nombre(n)}: elige una etapa`);
   }
   for (const a of aristas) {
     if (!numero.has(a.de) || !numero.has(a.a)) errores.push('Hay una conexión que apunta a un paso que no existe');
