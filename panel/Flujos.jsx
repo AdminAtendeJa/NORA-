@@ -48,7 +48,7 @@ function puertosValidos(tipo, d) {
 }
 
 // ---- Conversión entre el lienzo (nodos/aristas de React Flow) y la definición que se guarda ----
-const ESTILO_ARISTA = { type: 'default', markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 } };
+const ESTILO_ARISTA = { type: 'default', markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 } };
 function aLienzo(def, disparador) {
   const nodes = def.nodos.map((n) => {
     const { id, tipo, x, y, ...datos } = n;
@@ -129,6 +129,26 @@ function Tiempo({ id, data }) {
   );
 }
 
+// Un botón de respuesta es una píldora dentro de la burbuja; sus sinónimos se despliegan solo si hace falta.
+function BotonRespuesta({ i, b, cambiar, quitar, soloLectura }) {
+  const [abierto, setAbierto] = useState(false);
+  const mostrar = abierto || (b.sinonimos || []).length > 0;
+  return (
+    <div className="fl-pastilla">
+      <div className="fl-pastilla-fila">
+        <input className="nodrag" disabled={soloLectura} value={b.titulo} placeholder={`Botón ${i + 1}`} onChange={(e) => cambiar({ titulo: e.target.value })} aria-label={`Texto del botón ${i + 1}`} />
+        {!soloLectura && !mostrar && <button type="button" className="nodrag fl-mini" onClick={() => setAbierto(true)} aria-label={`Añadir sinónimos al botón ${i + 1}`} title="Añadir sinónimos: palabras que cuentan como este botón si el cliente escribe">＋</button>}
+        {!soloLectura && <button type="button" className="nodrag fl-mini" onClick={quitar} aria-label={`Quitar botón ${i + 1}`}>✕</button>}
+      </div>
+      {mostrar && (
+        <input className="nodrag fl-sin" disabled={soloLectura} value={(b.sinonimos || []).join(', ')} placeholder="sinónimos, separados por coma"
+          onChange={(e) => cambiar({ sinonimos: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} aria-label={`Sinónimos del botón ${i + 1}`} />
+      )}
+      <Handle type="source" position={Position.Right} id={`btn:${i}`} className="fl-handle" />
+    </div>
+  );
+}
+
 function NodoMensaje({ id, data, selected }) {
   const { actualizar, quitarBoton, soloLectura } = useContext(Ctx);
   const botones = data.botones || [];
@@ -136,22 +156,16 @@ function NodoMensaje({ id, data, selected }) {
   const cambiarBoton = (i, parche) => actualizar(id, { botones: botones.map((b, k) => (k === i ? { ...b, ...parche } : b)) });
   return (
     <Caja id={id} tipo="mensaje" selected={selected}>
-      <textarea className="nodrag nowheel" rows={3} disabled={soloLectura} value={data.texto} placeholder="Escribe el mensaje. {{nombre}} inserta datos del cliente."
-        onChange={(e) => actualizar(id, { texto: e.target.value })} />
-      {botones.map((b, i) => (
-        <div className="fl-boton" key={i}>
-          <div className="fl-boton-fila">
-            <input className="nodrag" disabled={soloLectura} value={b.titulo} placeholder={`Botón ${i + 1}`} onChange={(e) => cambiarBoton(i, { titulo: e.target.value })} aria-label={`Texto del botón ${i + 1}`} />
-            {!soloLectura && <button type="button" className="nodrag fl-x" onClick={() => quitarBoton(id, i)} aria-label={`Quitar botón ${i + 1}`}>✕</button>}
-          </div>
-          <input className="nodrag fl-sin" disabled={soloLectura} value={(b.sinonimos || []).join(', ')} placeholder="+ sinónimos (con comas)"
-            onChange={(e) => cambiarBoton(i, { sinonimos: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} aria-label={`Sinónimos del botón ${i + 1}`} />
-          <Handle type="source" position={Position.Right} id={`btn:${i}`} className="fl-handle" />
-        </div>
-      ))}
-      {!soloLectura && botones.length < MAX_BOTONES && (
-        <button type="button" className="nodrag fl-mas" onClick={() => actualizar(id, { botones: [...botones, { titulo: '', sinonimos: [] }] })}>＋ Botón de respuesta</button>
-      )}
+      <div className="fl-bub">
+        <textarea className="nodrag nowheel" rows={2} disabled={soloLectura} value={data.texto} placeholder="Escribe el mensaje. {{nombre}} inserta datos del cliente."
+          onChange={(e) => actualizar(id, { texto: e.target.value })} />
+        {botones.map((b, i) => (
+          <BotonRespuesta key={i} i={i} b={b} cambiar={(parche) => cambiarBoton(i, parche)} quitar={() => quitarBoton(id, i)} soloLectura={soloLectura} />
+        ))}
+        {!soloLectura && botones.length < MAX_BOTONES && (
+          <button type="button" className="nodrag fl-mas" onClick={() => actualizar(id, { botones: [...botones, { titulo: '', sinonimos: [] }] })}>＋ Botón de respuesta</button>
+        )}
+      </div>
       {botones.length === 0 && (
         <label className="fl-check"><input className="nodrag" type="checkbox" disabled={soloLectura} checked={!!data.espera} onChange={(e) => actualizar(id, { espera: e.target.checked })} /> Esperar la respuesta del cliente</label>
       )}
@@ -444,10 +458,10 @@ function Editor({ flujo, org, supabase, puedeEditar, onCerrar }) {
           <div className="fl-fondo-lienzo">
           <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={alConectar}
             onNodeDragStop={() => setSucio(true)} deleteKeyCode={puedeEditar ? ['Delete'] : null} nodesDraggable={puedeEditar} nodesConnectable={puedeEditar}
-            fitView fitViewOptions={{ padding: 0.3, maxZoom: 1 }} minZoom={0.2} maxZoom={1.5} colorMode="system" proOptions={{ hideAttribution: true }}>
+            fitView fitViewOptions={{ padding: 0.1, minZoom: 0.55, maxZoom: 1.1 }} minZoom={0.25} maxZoom={1.6} colorMode="system" proOptions={{ hideAttribution: true }}>
             <Background gap={22} />
             <Controls showInteractive={false} />
-            <MiniMap pannable zoomable className="fl-minimapa" />
+            <MiniMap pannable zoomable className="fl-minimapa" style={{ width: 150, height: 96 }} />
           </ReactFlow>
           {vistaPrevia && <Previsualizar def={def} onCerrar={() => setVistaPrevia(false)} />}
           </div>

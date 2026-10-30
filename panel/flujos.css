@@ -49,52 +49,61 @@
 .fl-lienzo { position: relative; flex: 1; min-height: 0; display: flex; }
 .fl-lienzo .react-flow { flex: 1; min-width: 0; }
 .fl-fondo-lienzo { position: relative; flex: 1; min-width: 0; display: flex; }
-.fl-paleta { flex: none; width: 168px; display: flex; flex-direction: column; gap: 4px; padding: 8px 6px; background: var(--fl-tarjeta); border-right: 1px solid var(--fl-borde); overflow-y: auto; }
+.fl-paleta { flex: none; width: 176px; display: flex; flex-direction: column; gap: 4px; padding: 8px 6px; background: var(--fl-tarjeta); border-right: 1px solid var(--fl-borde); overflow-y: auto; }
 .fl-paleta-tit { margin: 2px 8px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--fl-suave); }
 .fl-paleta button { display: flex; align-items: center; gap: 8px; text-align: left; border-color: transparent; background: transparent; padding: 6px 10px; }
 .fl-paleta button:hover { background: var(--fl-acento-fondo); }
-.fl-paleta small { font-size: 12.5px; }
+.fl-paleta small { font-size: 14px; }
 .fl-minimapa { border-radius: 8px; border: 1px solid var(--fl-borde); }
 .react-flow__controls-button { min-height: 0 !important; padding: 0 !important; }
 
 /* ===== Nodos ===== */
-.fl-nodo { width: 270px; background: var(--fl-tarjeta); border: 1px solid var(--fl-borde); border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.08); color: var(--fl-texto); }
+.fl-nodo { width: 310px; background: var(--fl-tarjeta); border: 1px solid var(--fl-borde); border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.08); color: var(--fl-texto); }
 .fl-nodo.sel { border-color: var(--fl-acento); box-shadow: 0 0 0 2px var(--fl-acento); }
-.fl-nodo-cab { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 11px 11px 0 0; background: var(--fl-cab, var(--fl-acento-fondo)); cursor: grab; font-size: 13px; }
+.fl-nodo-cab { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 11px 11px 0 0; background: var(--fl-cab, var(--fl-acento-fondo)); cursor: grab; font-size: 14.5px; }
 .fl-nodo-cab b { flex: 1; }
 .fl-n { font-size: 11px; color: var(--fl-suave); background: var(--fl-tarjeta); border-radius: 999px; padding: 0 7px; }
 .fl-x { border: 0 !important; background: transparent !important; min-height: 0 !important; padding: 0 6px !important; color: var(--fl-suave); font-size: 14px; line-height: 1; }
 .fl-x:hover { color: var(--fl-error); }
-.fl-nodo-cuerpo { padding: 10px; display: grid; gap: 8px; }
-.fl-nodo-cuerpo label { display: grid; gap: 3px; font-size: 12px; color: var(--fl-suave); }
-.fl-nodo-cuerpo select, .fl-nodo-cuerpo input, .fl-nodo-cuerpo textarea { font-size: 13.5px; }
+.fl-nodo-cuerpo { padding: 12px; display: grid; gap: 10px; }
+.fl-nodo-cuerpo label { display: grid; gap: 4px; font-size: 13px; color: var(--fl-suave); }
+.fl-nodo-cuerpo select, .fl-nodo-cuerpo input, .fl-nodo-cuerpo textarea { font-size: 15px; }
 .fl-t-inicio { --fl-cab: color-mix(in srgb, #1a9e5c 22%, var(--fl-tarjeta)); }
 .fl-t-mensaje { --fl-cab: color-mix(in srgb, #2f6fed 24%, var(--fl-tarjeta)); }
-.fl-t-mensaje textarea { background: var(--fl-azul); color: #fff; border-color: transparent; }
-.fl-t-mensaje textarea::placeholder { color: rgba(255,255,255,.75); }
+.fl-bub { background: var(--fl-azul); border-radius: 14px; padding: 10px; display: grid; gap: 8px; color: #fff; }
+.fl-bub textarea { background: transparent; color: #fff; border: 0; padding: 2px 4px; min-height: 0; font-size: 15px; resize: none; }
+.fl-bub textarea::placeholder { color: rgba(255,255,255,.75); }
+.fl-pastilla { position: relative; display: grid; gap: 4px; }
+.fl-pastilla-fila { display: flex; align-items: center; gap: 4px; }
+.fl-pastilla-fila input { flex: 1; min-width: 0; }
+.fl-pastilla input { background: rgba(255,255,255,.16); color: #fff; border: 1px solid rgba(255,255,255,.55); border-radius: 999px; text-align: center; min-height: 36px; font-size: 14.5px; }
+.fl-pastilla input::placeholder { color: rgba(255,255,255,.7); }
+.fl-pastilla input.fl-sin { font-size: 12.5px; min-height: 30px; text-align: left; padding-left: 12px; }
+.fl-mini { flex: none; border: 0 !important; background: rgba(255,255,255,.2) !important; color: #fff !important; border-radius: 999px !important; width: 28px; min-width: 28px; height: 28px; min-height: 28px !important; padding: 0 !important; font-size: 14px; line-height: 1; }
+.fl-mini:hover { background: rgba(255,255,255,.3) !important; }
+.fl-nodo .fl-pastilla .fl-handle { right: -28px; }
 .fl-t-pregunta { --fl-cab: color-mix(in srgb, #8a4fe0 22%, var(--fl-tarjeta)); }
 .fl-t-condicion { --fl-cab: color-mix(in srgb, #e0a800 28%, var(--fl-tarjeta)); }
 .fl-t-humano { --fl-cab: color-mix(in srgb, #d92d20 22%, var(--fl-tarjeta)); }
 .fl-t-fin { --fl-cab: color-mix(in srgb, #d92d20 18%, var(--fl-tarjeta)); }
 .fl-t-nora { --fl-cab: color-mix(in srgb, #0f766e 24%, var(--fl-tarjeta)); }
-.fl-boton { position: relative; display: grid; gap: 3px; padding: 6px 8px; border: 1px solid var(--fl-borde); border-radius: 8px; background: var(--fl-fondo); }
-.fl-boton-fila { display: flex; align-items: center; gap: 4px; }
-.fl-boton input.fl-sin { font-size: 12px; min-height: 30px; color: var(--fl-suave); }
-.fl-mas { border-style: dashed !important; color: var(--fl-acento) !important; font-size: 13px; min-height: 32px !important; }
+.fl-mas { border: 1px dashed rgba(255,255,255,.6) !important; background: transparent !important; color: #fff !important; font-size: 13.5px; min-height: 34px !important; border-radius: 999px !important; }
 .fl-check { display: flex !important; flex-direction: row !important; align-items: center; gap: 6px !important; }
 .fl-check input { width: 16px; height: 16px; min-height: 0; }
 .fl-inline { display: flex !important; align-items: center; gap: 6px !important; flex-direction: row !important; }
 .fl-min { width: 64px !important; text-align: center; }
-.fl-puerto { position: relative; display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 4px 4px 4px 0; font-size: 12px; color: var(--fl-suave); }
+.fl-puerto { position: relative; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 5px 4px 5px 0; font-size: 13px; color: var(--fl-suave); }
 .fl-puerto.ok { color: var(--fl-ok); } .fl-puerto.aviso { color: #b26a00; }
 .fl-puerto .fl-min { width: 56px !important; min-height: 28px !important; }
 .fl-pie { margin: 0; text-align: center; font-size: 12px; color: var(--fl-suave); border-top: 1px dashed var(--fl-borde); padding-top: 6px; }
 
 /* Los puntos de conexión sobresalen del borde del nodo, como en Kommo */
-.fl-nodo .fl-handle { width: 12px; height: 12px; background: var(--fl-tarjeta); border: 2px solid var(--fl-acento); right: -17px; }
-.fl-nodo .fl-handle-in { left: -7px; right: auto; top: 22px; background: var(--fl-acento); }
+.fl-nodo .fl-handle { width: 14px; height: 14px; background: var(--fl-tarjeta); border: 2px solid var(--fl-acento); right: -19px; }
+.fl-nodo .fl-handle-in { left: -8px; right: auto; top: 24px; background: var(--fl-acento); }
 .fl-nodo .fl-handle:hover { background: var(--fl-acento); }
-.react-flow__edge-path { stroke: var(--fl-acento); stroke-width: 2; }
+.fl-editor .react-flow { --xy-edge-stroke: var(--fl-acento); --xy-edge-stroke-selected: var(--fl-acento); --xy-edge-stroke-width: 2.5; --xy-connectionline-stroke: var(--fl-acento); }
+.react-flow__edge-path { stroke: var(--fl-acento); stroke-width: 2.5; }
+.react-flow__arrowhead polyline { stroke: var(--fl-acento) !important; fill: var(--fl-acento) !important; }
 .react-flow__edge.selected .react-flow__edge-path { stroke-width: 3; }
 .react-flow__connectionline path { stroke: var(--fl-acento); stroke-width: 2; stroke-dasharray: 5; }
 
@@ -114,7 +123,13 @@
 .fl-prev-pie button { flex: 1; }
 
 @media (max-width: 760px) {
-  .fl-nombre { flex: 1 1 100%; }
+  .fl-barra { padding: 6px 8px; gap: 6px; }
+  .fl-barra button { min-height: 34px; padding: 4px 10px; font-size: 13.5px; }
+  .fl-nombre { flex: 1 1 55%; min-width: 0; font-size: 15px !important; }
+  .fl-espacio { display: none; }
+  .fl-minimapa { display: none; }
+  .fl-nodo { width: 290px; }
+
   .fl-lienzo { flex-direction: column-reverse; }
   .fl-paleta { width: auto; flex-direction: row; border-right: 0; border-top: 1px solid var(--fl-borde); overflow-x: auto; overflow-y: hidden; padding: 6px; }
   .fl-paleta-tit { display: none; }
