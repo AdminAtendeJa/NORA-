@@ -1,0 +1,96 @@
+/* Editor de flujos. Todo está acotado bajo .fl para no chocar con los estilos del panel. */
+.fl {
+  --fl-fondo: var(--fondo, #f6f7f9); --fl-tarjeta: var(--superficie, #fff); --fl-borde: var(--borde, #dfe3e8);
+  --fl-texto: var(--texto, #1b1f24); --fl-suave: var(--suave, #5d6772);
+  --fl-acento: var(--acento, #0f766e); --fl-acento-texto: var(--acento-txt, #fff); --fl-acento-fondo: var(--out, #d9f2ee);
+  --fl-error: var(--error, #b42318); --fl-error-fondo: color-mix(in srgb, var(--fl-error) 14%, var(--fl-tarjeta));
+  --fl-aviso-fondo: color-mix(in srgb, #e0a800 22%, var(--fl-tarjeta));
+  --fl-burbuja-nora: var(--in, #eef0f3); --fl-burbuja-cli: var(--out, #d9f2ee);
+  display: grid; grid-template-columns: 220px minmax(0, 1fr) 320px; gap: 16px; padding: 16px; color: var(--fl-texto);
+  min-height: calc(100vh - 56px); box-sizing: border-box; font-size: 15px; line-height: 1.4;
+}
+.fl *, .fl *::before, .fl *::after { box-sizing: border-box; }
+.fl { background: var(--fl-fondo); }
+.fl h2, .fl h3, .fl h4 { margin: 0 0 8px; }
+.fl h2 { font-size: 18px; } .fl h3 { font-size: 15px; } .fl h4 { font-size: 13px; color: var(--fl-suave); }
+.fl small, .fl .fl-nota { color: var(--fl-suave); font-size: 13px; }
+.fl .fl-nota { margin: 6px 0; }
+.fl-centro { display: grid; place-items: center; color: var(--fl-suave); }
+
+.fl input, .fl select, .fl textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--fl-borde); border-radius: 8px; background: var(--fl-tarjeta); color: var(--fl-texto);
+  font: inherit; min-height: 40px;
+}
+.fl textarea { resize: vertical; }
+.fl input:focus-visible, .fl select:focus-visible, .fl textarea:focus-visible, .fl button:focus-visible { outline: 2px solid var(--fl-acento); outline-offset: 1px; }
+.fl fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 8px; }
+.fl label { display: grid; gap: 4px; font-size: 13px; color: var(--fl-suave); }
+.fl label input, .fl label select, .fl label textarea { color: var(--fl-texto); }
+
+.fl button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--fl-borde); background: var(--fl-tarjeta); color: var(--fl-texto); padding: 8px 12px; min-height: 40px; }
+.fl button:disabled { opacity: .5; cursor: not-allowed; }
+.fl .fl-primario { background: var(--fl-acento); color: var(--fl-acento-texto); border-color: var(--fl-acento); font-weight: 600; }
+.fl .fl-sec { background: transparent; }
+
+/* Lista lateral */
+.fl-lateral { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.fl-lateral ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.fl-lateral li button { width: 100%; text-align: left; display: flex; align-items: center; gap: 8px; border-color: transparent; background: transparent; }
+.fl-lateral li button.fl-sel { background: var(--fl-acento-fondo); border-color: var(--fl-acento); }
+.fl-punto { width: 9px; height: 9px; border-radius: 50%; background: var(--fl-borde); flex: none; }
+.fl-punto.on { background: var(--fl-acento); }
+
+/* Editor */
+.fl-editor, .fl-sim, .fl-vacio { background: var(--fl-tarjeta); border: 1px solid var(--fl-borde); border-radius: 12px; padding: 16px; min-width: 0; }
+.fl-vacio { grid-column: 2 / 4; display: grid; place-items: center; color: var(--fl-suave); }
+.fl-cab { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.fl-nombre { flex: 1 1 220px; font-size: 18px; font-weight: 600; }
+.fl-botones { display: flex; gap: 8px; flex-wrap: wrap; }
+.fl-msg { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; }
+.fl-msg.fl-ok { background: var(--fl-acento-fondo); } .fl-msg.fl-error { background: var(--fl-error-fondo); color: var(--fl-error); }
+.fl-aviso { background: var(--fl-aviso-fondo); padding: 8px 12px; border-radius: 8px; margin: 8px 0; font-size: 13px; }
+.fl-disparador { border: 1px dashed var(--fl-borde); border-radius: 10px; padding: 12px; margin-bottom: 16px; display: grid; gap: 8px; }
+
+/* Pasos */
+.fl-lista { display: grid; gap: 10px; position: relative; }
+.fl-paso { border: 1px solid var(--fl-borde); border-left: 4px solid var(--fl-acento); border-radius: 10px; padding: 10px 12px; background: var(--fl-fondo); display: grid; gap: 8px; }
+.fl-paso.fl-condicion { border-left-color: #b26a00; } .fl-paso.fl-humano { border-left-color: var(--fl-error); }
+.fl-paso-cab { display: flex; align-items: center; gap: 8px; }
+.fl-acciones { margin-left: auto; display: flex; gap: 4px; }
+.fl-acciones button { min-height: 32px; min-width: 32px; padding: 2px 8px; }
+.fl-cuerpo { display: grid; gap: 8px; }
+.fl-fila { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; align-items: end; }
+.fl-cond { grid-template-columns: auto minmax(100px, 1fr) minmax(120px, 1fr) minmax(100px, 1fr); align-items: center; }
+.fl-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--fl-texto); }
+.fl-inline input { width: 90px; }
+.fl-ramas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.fl-rama { border: 1px dashed var(--fl-borde); border-radius: 10px; padding: 10px; min-width: 0; }
+.fl-rama-si { background: color-mix(in srgb, var(--fl-acento-fondo) 40%, transparent); }
+.fl-agregar { position: relative; }
+.fl-btn-agregar { width: 100%; border-style: dashed; color: var(--fl-acento); font-weight: 600; background: transparent; }
+.fl-menu { position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); background: var(--fl-tarjeta); border: 1px solid var(--fl-borde); border-radius: 10px; padding: 6px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px; box-shadow: 0 8px 24px rgba(0,0,0,.18); max-height: 60vh; overflow: auto; }
+.fl-menu button { display: flex; gap: 10px; text-align: left; align-items: flex-start; border-color: transparent; background: transparent; }
+.fl-menu button:hover { background: var(--fl-acento-fondo); }
+.fl-menu small { display: block; }
+.fl-ico { font-size: 18px; line-height: 1.2; }
+.fl-errores { margin: 12px 0 0; padding: 8px 12px 8px 28px; background: var(--fl-error-fondo); color: var(--fl-error); border-radius: 8px; font-size: 13px; }
+
+/* Simulador */
+.fl-sim { display: flex; flex-direction: column; gap: 8px; align-self: start; position: sticky; top: 16px; max-height: calc(100vh - 32px); }
+.fl-chat { background: var(--fl-fondo); border-radius: 10px; padding: 10px; min-height: 200px; max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.fl-burbuja { max-width: 85%; padding: 7px 10px; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fl-burbuja.fl-nora { background: var(--fl-burbuja-nora); align-self: flex-start; }
+.fl-burbuja.fl-cli { background: var(--fl-burbuja-cli); align-self: flex-end; }
+.fl-burbuja.fl-sis { align-self: center; font-size: 12px; color: var(--fl-suave); background: transparent; border: 1px dashed var(--fl-borde); }
+.fl-datos { margin: 0; font-size: 12px; background: var(--fl-fondo); border-radius: 8px; padding: 8px; overflow: auto; max-height: 110px; }
+.fl-sim-form { display: flex; gap: 6px; }
+
+/* Móvil y tablet: una sola columna */
+@media (max-width: 1100px) { .fl { grid-template-columns: 200px minmax(0, 1fr); } .fl-sim { grid-column: 2; position: static; max-height: none; } .fl-vacio { grid-column: 2; } }
+@media (max-width: 720px) {
+  .fl { grid-template-columns: minmax(0, 1fr); padding: 12px; }
+  .fl-sim, .fl-vacio { grid-column: 1; }
+  .fl-lateral ul { grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; padding-bottom: 4px; }
+  .fl-ramas { grid-template-columns: minmax(0, 1fr); }
+  .fl-cond { grid-template-columns: minmax(0, 1fr); }
+}
