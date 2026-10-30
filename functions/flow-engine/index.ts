@@ -11,7 +11,7 @@ import { avanzar, estadoInicial, MAX_BOTONES_NATIVOS, MAX_TITULO_BOTON, type Acc
 
 const GRAPH = 'https://graph.facebook.com/v23.0';
 const TIPOS_TEXTO = ['text', 'button', 'interactive', 'location'];
-const ETAPAS = ['nuevo', 'interesado', 'cliente', 'perdido'];
+
 const MAX_TICK = 50;
 
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } });
@@ -75,8 +75,10 @@ async function aplicar(admin: any, conv: any, contactId: string | null, acciones
         await admin.rpc('contacto_guardar_dato', { p_contact: contactId, p_campo: a.campo, p_valor: a.valor });
       } else if (a.tipo === 'etiquetar' && contactId) {
         await admin.rpc('contacto_agregar_etiqueta', { p_contact: contactId, p_etiqueta: a.etiqueta });
-      } else if (a.tipo === 'etapa' && contactId && ETAPAS.includes(a.etapa)) {
-        await admin.from('contacts').update({ etapa: a.etapa }).eq('id', contactId);
+      } else if (a.tipo === 'etapa' && contactId) {
+        // Solo etapas que existen en el pipeline de este negocio
+        const { data: et } = await admin.from('pipeline_etapas').select('id').eq('organization_id', conv.organization_id).eq('clave', a.etapa).maybeSingle();
+        if (et) await admin.from('contacts').update({ etapa: a.etapa }).eq('id', contactId);
       } else if (a.tipo === 'humano') {
         await admin.from('conversations').update({ atiende: 'humano', handoff_reason: a.motivo }).eq('id', conv.id);
       }
