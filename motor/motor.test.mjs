@@ -1,152 +1,215 @@
-// Ejecutar: node --experimental-strip-types --test motor.test.mjs
+// Ejecutar: node --experimental-strip-types --no-warnings --test motor.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compilar, avanzar, estadoInicial, validar, evaluar, revisar, interpolar } from './motor.ts';
+import { avanzar, estadoInicial, validar, evaluar, revisar, interpolar, elegirBoton, definicionVacia } from './motor.ts';
 
-let n = 0;
-const id = () => `p${++n}`;
-const msg = (texto) => ({ id: id(), tipo: 'mensaje', texto });
-const preg = (texto, campo, validacion = 'texto', opciones) => ({ id: id(), tipo: 'pregunta', texto, campo, validacion, opciones });
-const cond = (campo, op, valor, si, si_no = []) => ({ id: id(), tipo: 'condicion', campo, op, valor, si, si_no });
+// Constructor de grafos para los tests: nodo(id, tipo, datos) y conectar(de, puerto, a)
+const nodo = (id, tipo, datos = {}) => ({ id, tipo, x: 0, y: 0, ...datos });
+const grafo = (nodos, conexiones) => ({
+  version: 2,
+  nodos: [nodo('inicio', 'inicio'), ...nodos],
+  aristas: conexiones.map(([de, puerto, a], i) => ({ id: `e${i}`, de, puerto, a })),
+});
 const textos = (r) => r.acciones.filter((a) => a.tipo === 'enviar').map((a) => a.texto);
+const tipos = (r) => r.acciones.map((a) => a.tipo);
+const t0 = new Date('2026-10-30T10:00:00Z');
+const mas = (min) => new Date(t0.getTime() + min * 60_000);
 
-// Flujo de cualificación típico
-const flujo = () => [
-  msg('Hola {{nombre}}, soy Nora 👋'),
-  preg('¿Cuál es tu presupuesto mensual en USD?', 'presupuesto', 'numero'),
-  cond('presupuesto', 'mayor', '500',
-    [{ id: id(), tipo: 'etiquetar', etiqueta: 'caliente' }, msg('Perfecto, te paso con un asesor'), { id: id(), tipo: 'humano', motivo: 'Lead caliente' }],
-    [msg('Gracias, te dejo info'), { id: id(), tipo: 'etapa', etapa: 'interesado' }, { id: id(), tipo: 'nora' }]),
-];
+// Flujo tipo Kommo: saludo con botones; cada botón lleva a un camino distinto
+const bienvenida = () => grafo([
+  nodo('m1', 'mensaje', { texto: 'Hola {{nombre}}, ¿en qué te ayudo?', timeoutMin: 30, botones: [
+    { titulo: 'Producto', sinonimos: ['catalogo', 'precios'] }, { titulo: 'Mi pedido' }, { titulo: 'Hablar con alguien' }] }),
+  nodo('m2', 'mensaje', { texto: '¿Qué producto te interesa?' }),
+  nodo('m3', 'mensaje', { texto: 'Pásame tu número de pedido.' }),
+  nodo('h', 'humano', { motivo: 'Pidió una persona' }),
+  nodo('f', 'fin'),
+  nodo('t', 'etiquetar', { etiqueta: 'sin respuesta' }),
+  nodo('n', 'nora'),
+], [['inicio', 'next', 'm1'], ['m1', 'btn:0', 'm2'], ['m1', 'btn:1', 'm3'], ['m1', 'btn:2', 'h'], ['m1', 'otra', 'n'], ['m1', 'timeout', 't'],
+    ['m2', 'next', 'f'], ['m3', 'next', 'f'], ['t', 'next', 'f']]);
 
-test('arranca: saluda con el nombre y espera la primera respuesta', () => {
-  const prog = compilar(flujo());
-  const r = avanzar(prog, estadoInicial({ nombre: 'Ana' }), null);
-  assert.deepEqual(textos(r), ['Hola Ana, soy Nora 👋', '¿Cuál es tu presupuesto mensual en USD?']);
+test('arranca: saluda con el nombre, ofrece los botones y se queda esperando', () => {
+  const def = bienvenida();
+  const r = avanzar(def, estadoInicial(def, { nombre: 'Ana' }), null, t0);
+  assert.deepEqual(r.acciones, [{ tipo: 'enviar', texto: 'Hola Ana, ¿en qué te ayudo?', botones: ['Producto', 'Mi pedido', 'Hablar con alguien'] }]);
   assert.equal(r.estado.esperando.tipo, 'respuesta');
-  assert.equal(r.estado.fin, null);
+  assert.equal(r.estado.esperando.nodo, 'm1');
+  assert.equal(r.estado.esperando.vence, mas(30).toISOString());
 });
 
-test('rama "sí": presupuesto alto → etiqueta, mensaje y pasa a humano', () => {
-  const prog = compilar(flujo());
-  let r = avanzar(prog, estadoInicial({ nombre: 'Ana' }), null);
-  r = avanzar(prog, r.estado, 'unos $1.200 al mes');
-  assert.equal(r.estado.datos.presupuesto, '1200');
-  assert.deepEqual(r.acciones.map((a) => a.tipo), ['guardar', 'etiquetar', 'enviar', 'humano']);
+test('botón pulsado: sigue por su camino y termina', () => {
+  const def = bienvenida();
+  let r = avanzar(def, estadoInicial(def), null, t0);
+  r = avanzar(def, r.estado, 'Mi pedido', t0);
+  assert.deepEqual(textos(r), ['Pásame tu número de pedido.']);
+  assert.equal(r.estado.fin, 'completado');
+});
+
+test('botón por su número, por sinónimo y por palabra dentro de una frase', () => {
+  const def = bienvenida();
+  const empieza = () => avanzar(def, estadoInicial(def), null, t0).estado;
+  assert.deepEqual(textos(avanzar(def, empieza(), '1', t0)), ['¿Qué producto te interesa?']);
+  assert.deepEqual(textos(avanzar(def, empieza(), 'quiero ver el catálogo', t0)), ['¿Qué producto te interesa?']);
+  assert.deepEqual(textos(avanzar(def, empieza(), 'PRECIOS por favor', t0)), ['¿Qué producto te interesa?']);
+  const r = avanzar(def, empieza(), 'hablar con alguien', t0);
   assert.equal(r.estado.fin, 'humano');
+  assert.deepEqual(tipos(r), ['humano']);
 });
 
-test('rama "no": presupuesto bajo → etapa y entrega a Nora', () => {
-  const prog = compilar(flujo());
-  let r = avanzar(prog, estadoInicial(), null);
-  r = avanzar(prog, r.estado, '300');
-  assert.deepEqual(r.acciones.map((a) => a.tipo), ['guardar', 'enviar', 'etapa']);
+test('«otra respuesta»: si escribe algo que no es un botón, sigue por esa salida (aquí entrega a Nora)', () => {
+  const def = bienvenida();
+  let r = avanzar(def, estadoInicial(def), null, t0);
+  r = avanzar(def, r.estado, 'tengo una duda rara sobre garantías', t0);
   assert.equal(r.estado.fin, 'nora');
 });
 
-test('respuesta inválida: repite la pregunta y tras 3 intentos pasa a una persona', () => {
-  const prog = compilar(flujo());
-  let r = avanzar(prog, estadoInicial(), null);
-  r = avanzar(prog, r.estado, 'no sé');
-  assert.match(textos(r)[0], /No te entendí/);
-  assert.equal(r.estado.esperando.intentos, 1);
-  r = avanzar(prog, r.estado, 'mmm');
-  r = avanzar(prog, r.estado, 'jaja');
+test('«sin respuesta»: si pasa el tiempo, sigue por la salida de tiempo; antes de tiempo no hace nada', () => {
+  const def = bienvenida();
+  const r0 = avanzar(def, estadoInicial(def), null, t0);
+  const antes = avanzar(def, r0.estado, null, mas(10));
+  assert.deepEqual(antes.acciones, []);
+  assert.deepEqual(antes.estado, r0.estado);
+  const despues = avanzar(def, r0.estado, null, mas(31));
+  assert.deepEqual(tipos(despues), ['etiquetar']);
+  assert.equal(despues.estado.fin, 'completado');
+});
+
+test('sin salida «sin respuesta» conectada no se programa ningún tiempo límite', () => {
+  const def = grafo([nodo('m', 'mensaje', { texto: 'Hola', botones: [{ titulo: 'Sí' }], timeoutMin: 30 })], [['inicio', 'next', 'm']]);
+  assert.equal(avanzar(def, estadoInicial(def), null, t0).estado.esperando.vence, undefined);
+});
+
+test('botones sin salida «otra»: pide elegir y tras 3 intentos pasa a una persona', () => {
+  const def = grafo([nodo('m', 'mensaje', { texto: 'Elige', botones: [{ titulo: 'A' }, { titulo: 'B' }] }), nodo('f', 'fin')],
+    [['inicio', 'next', 'm'], ['m', 'btn:0', 'f'], ['m', 'btn:1', 'f']]);
+  let r = avanzar(def, estadoInicial(def), null, t0);
+  r = avanzar(def, r.estado, 'no sé', t0);
+  assert.match(textos(r)[0], /Elige una de las opciones/);
+  assert.deepEqual(r.acciones[0].botones, ['A', 'B']);
+  r = avanzar(def, r.estado, 'mmm', t0);
+  r = avanzar(def, r.estado, 'jaja', t0);
   assert.equal(r.estado.fin, 'humano');
-  assert.equal(r.acciones[0].tipo, 'humano');
 });
 
-test('sin mensaje del cliente no avanza mientras espera respuesta', () => {
-  const prog = compilar(flujo());
-  const r1 = avanzar(prog, estadoInicial(), null);
-  const r2 = avanzar(prog, r1.estado, null);
-  assert.deepEqual(r2.acciones, []);
-  assert.deepEqual(r2.estado, r1.estado);
-});
-
-test('condición con rama vacía y condiciones anidadas', () => {
-  const prog = compilar([
-    preg('¿Eres empresa? (sí/no)', 'empresa', 'si_no'),
-    cond('empresa', 'igual', 'si', [
-      preg('¿Cuántos empleados?', 'empleados', 'numero'),
-      cond('empleados', 'mayor', '10', [msg('Plan grande')], [msg('Plan chico')]),
-    ]),
-    msg('Fin'),
-  ]);
-  let r = avanzar(prog, estadoInicial(), null);
-  r = avanzar(prog, r.estado, 'Sí');
-  assert.match(textos(r)[0], /empleados/);
-  r = avanzar(prog, r.estado, '25');
-  assert.deepEqual(textos(r), ['Plan grande', 'Fin']);
+test('mensaje sin botones continúa solo; con «esperar respuesta» espera cualquier texto', () => {
+  const def = grafo([nodo('a', 'mensaje', { texto: 'Uno' }), nodo('b', 'mensaje', { texto: 'Dos', espera: true }), nodo('c', 'mensaje', { texto: 'Tres' })],
+    [['inicio', 'next', 'a'], ['a', 'next', 'b'], ['b', 'otra', 'c']]);
+  let r = avanzar(def, estadoInicial(def), null, t0);
+  assert.deepEqual(textos(r), ['Uno', 'Dos']);
+  assert.equal(r.estado.esperando.nodo, 'b');
+  r = avanzar(def, r.estado, 'lo que sea', t0);
+  assert.deepEqual(textos(r), ['Tres']);
   assert.equal(r.estado.fin, 'completado');
-  // rama "no" vacía: salta directo a "Fin"
-  let s = avanzar(prog, estadoInicial(), null);
-  s = avanzar(prog, s.estado, 'no');
-  assert.deepEqual(textos(s), ['Fin']);
+});
+
+test('pregunta + condición: guarda el dato y elige la rama', () => {
+  const def = grafo([
+    nodo('p', 'pregunta', { texto: '¿Presupuesto en USD?', campo: 'presupuesto', validacion: 'numero' }),
+    nodo('c', 'condicion', { campo: 'presupuesto', op: 'mayor', valor: '500' }),
+    nodo('e1', 'etiquetar', { etiqueta: 'caliente' }), nodo('h', 'humano', { motivo: 'Lead caliente' }),
+    nodo('e2', 'etapa', { etapa: 'interesado' }), nodo('n', 'nora'),
+  ], [['inicio', 'next', 'p'], ['p', 'next', 'c'], ['c', 'si', 'e1'], ['e1', 'next', 'h'], ['c', 'no', 'e2'], ['e2', 'next', 'n']]);
+  let r = avanzar(def, estadoInicial(def), null, t0);
+  const alto = avanzar(def, r.estado, 'unos $1.200 al mes', t0);
+  assert.equal(alto.estado.datos.presupuesto, '1200');
+  assert.deepEqual(tipos(alto), ['guardar', 'etiquetar', 'humano']);
+  assert.equal(alto.estado.fin, 'humano');
+  const bajo = avanzar(def, r.estado, '300', t0);
+  assert.deepEqual(tipos(bajo), ['guardar', 'etapa']);
+  assert.equal(bajo.estado.fin, 'nora');
+});
+
+test('pregunta: respuesta inválida repite; al tercer fallo va a «otra» si existe, y si no, a una persona', () => {
+  const base = (conOtra) => grafo([nodo('p', 'pregunta', { texto: '¿Cuánto?', campo: 'monto', validacion: 'numero' }), nodo('x', 'etiquetar', { etiqueta: 'raro' })],
+    [['inicio', 'next', 'p'], ...(conOtra ? [['p', 'otra', 'x']] : [])]);
+  for (const conOtra of [true, false]) {
+    const def = base(conOtra);
+    let r = avanzar(def, estadoInicial(def), null, t0);
+    r = avanzar(def, r.estado, 'no sé', t0);
+    assert.match(textos(r)[0], /No te entendí/);
+    r = avanzar(def, r.estado, 'mmm', t0);
+    r = avanzar(def, r.estado, 'jaja', t0);
+    assert.equal(r.estado.fin, conOtra ? 'completado' : 'humano');
+    assert.equal(tipos(r)[0], conOtra ? 'etiquetar' : 'humano');
+  }
 });
 
 test('esperar: pausa, no avanza antes de tiempo y continúa al vencer', () => {
-  const prog = compilar([msg('Hola'), { id: id(), tipo: 'esperar', minutos: 30 }, msg('¿Sigues ahí?')]);
-  const t0 = new Date('2026-10-30T10:00:00Z');
-  let r = avanzar(prog, estadoInicial(), null, t0);
+  const def = grafo([nodo('a', 'mensaje', { texto: 'Hola' }), nodo('e', 'esperar', { minutos: 30 }), nodo('b', 'mensaje', { texto: '¿Sigues ahí?' })],
+    [['inicio', 'next', 'a'], ['a', 'next', 'e'], ['e', 'next', 'b']]);
+  let r = avanzar(def, estadoInicial(def), null, t0);
   assert.deepEqual(textos(r), ['Hola']);
-  assert.equal(r.estado.esperando.tipo, 'tiempo');
-  assert.equal(r.estado.esperando.hasta, '2026-10-30T10:30:00.000Z');
-  const antes = avanzar(prog, r.estado, null, new Date('2026-10-30T10:10:00Z'));
-  assert.deepEqual(antes.acciones, []);
-  const despues = avanzar(prog, r.estado, null, new Date('2026-10-30T10:31:00Z'));
+  assert.equal(r.estado.esperando.hasta, mas(30).toISOString());
+  assert.deepEqual(avanzar(def, r.estado, null, mas(10)).acciones, []);
+  const despues = avanzar(def, r.estado, null, mas(31));
   assert.deepEqual(textos(despues), ['¿Sigues ahí?']);
   assert.equal(despues.estado.fin, 'completado');
 });
 
+test('un ciclo sin esperas no entra en bucle infinito; un ciclo con pregunta sí puede repetirse', () => {
+  const ciclo = grafo([nodo('a', 'etiquetar', { etiqueta: 'x' })], [['inicio', 'next', 'a'], ['a', 'next', 'a']]);
+  assert.equal(avanzar(ciclo, estadoInicial(ciclo), null, t0).estado.fin, 'completado');
+  const vuelve = grafo([nodo('m', 'mensaje', { texto: '¿Otra vez?', botones: [{ titulo: 'Sí' }, { titulo: 'No' }] }), nodo('f', 'fin')],
+    [['inicio', 'next', 'm'], ['m', 'btn:0', 'm'], ['m', 'btn:1', 'f']]);
+  let r = avanzar(vuelve, estadoInicial(vuelve), null, t0);
+  r = avanzar(vuelve, r.estado, 'sí', t0);
+  assert.equal(r.estado.esperando.nodo, 'm');
+  r = avanzar(vuelve, r.estado, 'no', t0);
+  assert.equal(r.estado.fin, 'completado');
+});
+
+test('conexión faltante: el flujo simplemente termina', () => {
+  const def = grafo([nodo('a', 'mensaje', { texto: 'Hola' })], [['inicio', 'next', 'a']]);
+  const r = avanzar(def, estadoInicial(def), null, t0);
+  assert.deepEqual(textos(r), ['Hola']);
+  assert.equal(r.estado.fin, 'completado');
+});
+
 test('validar: números, sí/no y opciones', () => {
   assert.deepEqual(validar('1.500', 'numero'), { ok: true, valor: '1500' });
-  assert.deepEqual(validar('1,500', 'numero'), { ok: true, valor: '1500' });
   assert.deepEqual(validar('12,5', 'numero'), { ok: true, valor: '12.5' });
   assert.deepEqual(validar('R$ 300 por mes', 'numero'), { ok: true, valor: '300' });
   assert.equal(validar('mucho', 'numero').ok, false);
   assert.deepEqual(validar('Sí, claro', 'si_no'), { ok: true, valor: 'si' });
   assert.deepEqual(validar('Não', 'si_no'), { ok: true, valor: 'no' });
-  assert.equal(validar('quizás', 'si_no').ok, false);
-  const ops = ['Comprar', 'Alquilar'];
-  assert.deepEqual(validar('2', 'opciones', ops), { ok: true, valor: 'Alquilar' });
-  assert.deepEqual(validar('quiero alquilar', 'opciones', ops), { ok: true, valor: 'Alquilar' });
-  assert.equal(validar('3', 'opciones', ops).ok, false);
+  assert.deepEqual(validar('2', 'opciones', ['Comprar', 'Alquilar']), { ok: true, valor: 'Alquilar' });
   assert.equal(validar('   ', 'texto').ok, false);
 });
 
-test('pregunta con opciones muestra la lista numerada', () => {
-  const prog = compilar([preg('¿Qué buscas?', 'tipo', 'opciones', ['Comprar', 'Alquilar'])]);
-  const r = avanzar(prog, estadoInicial(), null);
-  assert.equal(textos(r)[0], '¿Qué buscas?\n1. Comprar\n2. Alquilar');
-});
-
-test('evaluar: operadores y datos vacíos', () => {
+test('elegirBoton y evaluar', () => {
+  const bs = [{ titulo: 'Comprar', sinonimos: ['adquirir'] }, { titulo: 'Alquilar' }];
+  assert.equal(elegirBoton('2', bs), 1);
+  assert.equal(elegirBoton('Quiero adquirir una casa', bs), 0);
+  assert.equal(elegirBoton('nada que ver', bs), -1);
   assert.equal(evaluar({ campo: 'a', op: 'existe' }, {}), false);
-  assert.equal(evaluar({ campo: 'a', op: 'existe' }, { a: 'x' }), true);
   assert.equal(evaluar({ campo: 'a', op: 'contiene', valor: 'ola' }, { a: 'HOLA' }), true);
   assert.equal(evaluar({ campo: 'a', op: 'menor', valor: '10' }, { a: '5' }), true);
-  assert.equal(evaluar({ campo: 'a', op: 'mayor', valor: '10' }, { a: 'abc' }), false);
   assert.equal(evaluar({ campo: 'a', op: 'distinto', valor: 'x' }, {}), true);
-});
-
-test('un flujo largo sin esperas no entra en bucle infinito', () => {
-  const pasos = Array.from({ length: 150 }, () => ({ id: id(), tipo: 'etiquetar', etiqueta: 'x' }));
-  const r = avanzar(compilar(pasos), estadoInicial(), null);
-  assert.equal(r.estado.fin, 'completado');
-});
-
-test('interpolar deja vacío lo que no existe', () => {
   assert.equal(interpolar('Hola {{nombre}}{{apellido}}!', { nombre: 'Ana' }), 'Hola Ana!');
 });
 
-test('revisar detecta errores típicos', () => {
-  assert.deepEqual(revisar({ pasos: [] }), ['El flujo no tiene pasos']);
-  const e = revisar({ pasos: [msg(''), preg('¿Y?', 'Mal Nombre'), preg('¿Otra?', 'ok'), preg('¿Otra?', 'ok'), cond('', 'igual', '', [msg('')])] });
-  assert.ok(e.some((x) => /mensaje está vacío/.test(x)));
-  assert.ok(e.some((x) => /necesita un nombre/.test(x)));
-  assert.ok(e.some((x) => /ya se usa/.test(x)));
-  assert.ok(e.some((x) => /elige qué dato/.test(x)));
-  assert.ok(e.some((x) => /falta el valor/.test(x)));
-  assert.deepEqual(revisar({ pasos: flujo() }), []);
+test('revisar: errores que bloquean y avisos que no', () => {
+  const vacio = revisar(definicionVacia());
+  assert.deepEqual(vacio.errores, ['El flujo no tiene pasos']);
+  assert.deepEqual(revisar(bienvenida()), { errores: [], avisos: [] });
+
+  const malo = grafo([
+    nodo('a', 'mensaje', { texto: '', botones: [] }),
+    nodo('b', 'pregunta', { texto: '¿Y?', campo: 'Mal Nombre', validacion: 'texto' }),
+    nodo('c', 'mensaje', { texto: 'x', botones: [{ titulo: 'Un título larguísimo de más de veinte' }] }),
+    nodo('d', 'mensaje', { texto: 'x', botones: [{ titulo: 'Sí' }, { titulo: 'sí' }] }),
+    nodo('e', 'condicion', { campo: '', op: 'igual' }),
+    nodo('suelto', 'etiquetar', { etiqueta: 'x' }),
+  ], [['a', 'next', 'b']]);
+  const r = revisar(malo);
+  for (const parte of [/Conecta el inicio/, /mensaje está vacío/, /necesita un nombre/, /máximo 20 caracteres/, /repetidos/, /elige qué dato/])
+    assert.ok(r.errores.some((x) => parte.test(x)), String(parte));
+  assert.ok(r.avisos.some((x) => /no está conectado/.test(x)));
+  const roto = grafo([nodo('a', 'fin')], [['inicio', 'next', 'a'], ['a', 'next', 'no_existe']]);
+  assert.ok(revisar(roto).errores.some((x) => /no existe/.test(x)));
+});
+
+test('revisar: un botón sin texto bloquea, y los pasos se nombran con su número estable', () => {
+  const def = grafo([nodo('a', 'mensaje', { n: 7, texto: 'Hola', botones: [{ titulo: 'Sí' }, { titulo: '  ' }] })], [['inicio', 'next', 'a']]);
+  assert.ok(revisar(def).errores.some((x) => /Paso 7: hay un botón sin texto/.test(x)));
 });

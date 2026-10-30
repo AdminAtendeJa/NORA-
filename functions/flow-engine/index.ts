@@ -7,7 +7,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { timingSafeEqual } from 'node:crypto';
-import { avanzar, compilar, estadoInicial, interpolar, type Accion, type Definicion, type Estado } from './motor.ts';
+import { avanzar, estadoInicial, MAX_BOTONES_NATIVOS, MAX_TITULO_BOTON, type Accion, type Definicion, type Estado } from './motor.ts';
 
 const GRAPH = 'https://graph.facebook.com/v23.0';
 const TIPOS_TEXTO = ['text', 'button', 'interactive', 'location'];
@@ -25,15 +25,34 @@ function esServicio(req: Request): boolean {
   return !!real && a.length === b.length && timingSafeEqual(a, b);
 }
 
-async function enviarTexto(admin: any, phoneNumberId: string, para: string, texto: string) {
+type Envio = { ok: boolean; wamid?: string; error?: string };
+type Enviar = Extract<Accion, { tipo: 'enviar' }>;
+
+// Hasta 3 botones salen como botones nativos de WhatsApp; con más, como lista numerada (el cliente escribe el número).
+function cuerpoWhatsApp(para: string, a: Enviar): Record<string, unknown> {
+  const botones = a.botones || [];
+  if (botones.length === 0) return { to: para, type: 'text', text: { body: a.texto, preview_url: false } };
+  if (botones.length <= MAX_BOTONES_NATIVOS) {
+    return {
+      to: para, type: 'interactive',
+      interactive: {
+        type: 'button', body: { text: a.texto.slice(0, 1024) },
+        action: { buttons: botones.map((t, i) => ({ type: 'reply', reply: { id: `b${i}`, title: t.slice(0, MAX_TITULO_BOTON) } })) },
+      },
+    };
+  }
+  return { to: para, type: 'text', text: { body: `${a.texto}\n${botones.map((t, i) => `${i + 1}. ${t}`).join('\n')}`, preview_url: false } };
+}
+
+async function enviarMensaje(admin: any, phoneNumberId: string, cuerpo: Record<string, unknown>): Promise<Envio> {
   const { data: secreto } = await admin.rpc('leer_secreto_whatsapp', { p_phone_number_id: phoneNumberId });
   let token = '';
   try { token = JSON.parse(secreto || '{}').token || ''; } catch { /* secreto mal formado */ }
-  if (!token) return { ok: false, error: 'Sin token de WhatsApp para este número' } as { ok: boolean; wamid?: string; error?: string };
+  if (!token) return { ok: false, error: 'Sin token de WhatsApp para este número' };
   const r = await fetch(`${GRAPH}/${phoneNumberId}/messages`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messaging_product: 'whatsapp', to: para, type: 'text', text: { body: texto, preview_url: false } }),
+    body: JSON.stringify({ messaging_product: 'whatsapp', ...cuerpo }),
     signal: AbortSignal.timeout(15000),
   });
   const d: any = await r.json().catch(() => ({}));
@@ -46,10 +65,11 @@ async function aplicar(admin: any, conv: any, contactId: string | null, acciones
   for (const a of acciones) {
     try {
       if (a.tipo === 'enviar') {
-        const envio = await enviarTexto(admin, conv.phone_number_id, conv.phone, a.texto);
+        const envio = await enviarMensaje(admin, conv.phone_number_id, cuerpoWhatsApp(conv.phone, a));
+        const opciones = (a.botones || []).length ? `\n${(a.botones || []).map((b) => `▫ ${b}`).join('\n')}` : '';
         await admin.from('messages').insert({
           organization_id: conv.organization_id, conversation_id: conv.id, wamid: envio.wamid ?? null, direction: 'saliente', autor: 'nora', type: 'text',
-          body: a.texto, delivery_status: envio.ok ? 'sent' : 'failed', delivery_error: envio.ok ? null : envio.error,
+          body: `${a.texto}${opciones}`, delivery_status: envio.ok ? 'sent' : 'failed', delivery_error: envio.ok ? null : envio.error,
         });
       } else if (a.tipo === 'guardar' && contactId) {
         await admin.rpc('contacto_guardar_dato', { p_contact: contactId, p_campo: a.campo, p_valor: a.valor });
@@ -69,14 +89,13 @@ function estadoAFila(estado: Estado) {
   return {
     estado,
     status: terminado ? 'completada' : 'activa',
-    siguiente_ejecucion: !terminado && estado.esperando?.tipo === 'tiempo' ? estado.esperando.hasta : null,
+    siguiente_ejecucion: terminado || !estado.esperando ? null : estado.esperando.tipo === 'tiempo' ? estado.esperando.hasta : (estado.esperando.vence ?? null),
   };
 }
 
 // Avanza una ejecución. El UPDATE con `updated_at` evita que dos mensajes seguidos la avancen a la vez.
 async function ejecutar(admin: any, conv: any, run: any, entrada: string | null): Promise<{ fin: Estado['fin'] }> {
-  const prog = compilar((run.definicion as Definicion).pasos || []);
-  const { estado, acciones } = avanzar(prog, run.estado as Estado, entrada);
+  const { estado, acciones } = avanzar(run.definicion as Definicion, run.estado as Estado, entrada);
   const { data: tomada } = await admin.from('flujo_ejecuciones').update(estadoAFila(estado))
     .eq('id', run.id).eq('updated_at', run.updated_at).eq('status', 'activa').select('id');
   if (!tomada?.length) return { fin: null };  // otro proceso ya la avanzó
@@ -175,7 +194,7 @@ Deno.serve(async (req) => {
     if (!elegido) return json({ handled: false });
 
     const datos = { ...conv.datos, ...(conv.nombre ? { nombre: conv.nombre } : {}) };
-    const estado = estadoInicial(datos);
+    const estado = estadoInicial(elegido.definicion as Definicion, datos);
     const { data: nueva, error } = await admin.from('flujo_ejecuciones').insert({
       organization_id: conv.organization_id, flujo_id: elegido.id, conversation_id: conv.id, contact_id: conv.contact_id,
       definicion: elegido.definicion, estado,
