@@ -12,10 +12,11 @@ contesta con voz y ejecuta **flujos de automatización estilo Kommo (Salesbot)**
 | Carpeta | Qué es | Estado |
 |---|---|---|
 | `motor/` | Motor de flujos **v2, basado en grafo de nodos** (lógica pura) y sus 17 tests | Probado |
-| `panel/` | `Panel.jsx` (bandeja, flujos, conocimiento, WhatsApp), `Flujos.jsx` (**editor de lienzo estilo Kommo** con previsualización), estilos, `motor.ts` y `package.json` (añade `@xyflow/react`) | En producción |
+| `panel/` | `Panel.jsx` (bandeja, flujos, conocimiento, WhatsApp), `Pipeline.jsx` (**tablero tipo Kommo**: pipelines y etapas que crea el cliente, tarjetas arrastrables con valor), `Flujos.jsx` (**editor de lienzo estilo Kommo** con previsualización), estilos, `motor.ts` y `package.json` (añade `@xyflow/react`) | En producción |
 | `sql/0008_flujos.sql` | Tablas `flujos` y `flujo_ejecuciones`, RLS y funciones | Aplicada |
 | `sql/0009_0011_cron_flujos.sql` | Cron que despierta los pasos «Esperar» y los «Sin respuesta» (estado final) | Aplicada |
 | `sql/0012_flujos_grafo.sql` | Cambia `flujos.definicion` de lista de pasos a grafo (`nodos` + `aristas`) | Aplicada |
+| `sql/0013_pipeline.sql` + `sql/0014_pipelines_multiples.sql` | Pipeline: `pipelines` y `pipeline_etapas` creados por el cliente, `contacts.pipeline_id/valor/etapa_desde`, `eliminar_etapa`, `eliminar_pipeline` | Aplicadas |
 | `functions/flow-engine/` | Ejecuta los flujos (botones nativos de WhatsApp, tiempos límite) | Desplegada (v2) |
 | `functions/whatsapp-webhook/` | Webhook de Meta: primero consulta a `flow-engine`; si no se ocupa, responde Nora | Desplegada (v4) |
 | `functions/nora-responder/` | Nora: transcribe audios (OpenAI), responde (OpenAI o Claude) y envía voz (ElevenLabs) | Desplegada (v2) |
@@ -86,7 +87,8 @@ cd motor && node --experimental-strip-types --no-warnings --test motor.test.mjs
 
 - Los flujos solo entienden **texto y botones**: si el cliente responde con audio a una pregunta, se le pide que escriba.
 - Durante un paso «Pausa», si el cliente escribe, responde Nora.
-- Las etapas son cuatro fijas (`nuevo`, `interesado`, `cliente`, `perdido`).
+- El paso «Etapa» de un flujo guarda el **id** de la etapa; los flujos antiguos con claves fijas (`nuevo`…) siguen funcionando dentro del pipeline del contacto.
+- El pipeline no tiene aún disparadores por etapa (p. ej. lanzar un flujo al entrar en una etapa).
 - Los botones son «respuestas rápidas» de WhatsApp (máx. 3 nativos, 20 caracteres). No hay aún disparadores por etapa ni retraso de arranque (Kommo sí los tiene).
 - La previsualización del lienzo está probada con datos falsos; los botones nativos de WhatsApp no se han probado con Meta real.
 - La bandeja es de solo lectura: se puede pausar/reactivar a Nora por conversación, pero **responder como persona desde el panel aún no existe**
